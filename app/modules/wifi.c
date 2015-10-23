@@ -387,8 +387,7 @@ static int wifi_getbroadcast( lua_State* L, uint8_t mode )
     return 1;
   }
 }
-
-
+PHY_RATE_48
 static uint32_t parse_key(lua_State* L, const char * key){
   lua_getfield(L, 1, key);
   if( lua_isstring(L, -1) )   // deal with the ip/netmask/gw string
@@ -453,6 +452,51 @@ static int wifi_sleeptype( lua_State* L )
   type = wifi_get_sleep_type();
   lua_pushinteger( L, type );
   return 1;  
+}
+
+// lua: wifi.installstatusled(pin)
+static int wifi_statusledinstall( lua_State* L ){
+	if (lua_isnil(L, 1)) {
+		wifi_status_led_uninstall();
+		return 0;
+	}
+	else{
+		unsigned pin = luaL_checkinteger( L, 1 );
+
+		uint32 muxname;
+		uint8 pinfunc;
+		switch (pin){
+		case 0:
+			muxname = PERIPHS_IO_MUX_GPIO0_U;
+			pinfunc = FUNC_GPIO0;
+			break;
+		case 4:
+			muxname = PERIPHS_IO_MUX_GPIO4_U;
+			pinfunc = FUNC_GPIO4;
+			break;
+		case 5:
+			muxname = PERIPHS_IO_MUX_GPIO5_U;
+			pinfunc = FUNC_GPIO5;
+			break;
+		case 12:
+			muxname = PERIPHS_IO_MUX_MTDI_U;
+			pinfunc = FUNC_GPIO12;
+			break;
+		case 13:
+			muxname = PERIPHS_IO_MUX_MTCK_U;
+			pinfunc = FUNC_GPIO13;
+			break;
+		case 14:
+			muxname = PERIPHS_IO_MUX_MTMS_U;
+			pinfunc = FUNC_GPIO14;
+			break;
+
+		default:
+			return luaL_error (L, "only supports GPIO pins 0,4,5 and 12-14");
+		}
+		wifi_status_led_install(pin,muxname,pinfunc );
+		return 0;
+	}
 }
 
 // Lua: wifi.sta.getmac()
@@ -1029,6 +1073,31 @@ static int wifi_station_event_mon_start(lua_State* L)
   os_timer_arm(&wifi_sta_status_timer, ms, 1);
   return 0;
 }
+// Lua: wifi.sta.sethostname()
+static int wifi_station_sethostname( lua_State* L ){
+	int hnlength;
+	const char *hostname = luaL_checklstring( L, 1, &hnlength );
+	if ((hnlength!=0 && hnlength>32) || hostname == NULL){
+		return luaL_error( L, "hostname cant be longer than 32 chars" );
+	}
+	int success = wifi_station_set_hostname((char*)hostname);
+	lua_pushboolean(L, success);
+	return 1;
+}
+// Lua: wifi.sta.gethostname()
+static int wifi_station_gethostname( lua_State* L ){
+	char *hostname = wifi_station_get_hostname();
+	lua_pushlstring(L, hostname,strlen(hostname));
+	return 1;
+}
+// Lua: wifi.sta.setreconpolicy()
+static int wifi_station_setreconpolicy( lua_State* L ){
+	int rpol = luaL_checkinteger(L,1);
+	if ( rpol != 0 && rpol != 1 )
+	    return luaL_error( L, "wrong arg" );
+	lua_pushboolean(L, wifi_station_set_reconnect_policy(rpol));
+	return 1;
+}
 
 // Lua: wifi.ap.getmac()
 static int wifi_ap_getmac( lua_State* L ){
@@ -1293,6 +1362,9 @@ static const LUA_REG_TYPE wifi_station_map[] =
   { LSTRKEY( "eventMonReg" ), LFUNCVAL ( wifi_station_event_mon_reg ) },
   { LSTRKEY( "eventMonStart" ), LFUNCVAL ( wifi_station_event_mon_start ) },
   { LSTRKEY( "eventMonStop" ), LFUNCVAL ( wifi_station_event_mon_stop ) },
+  { LSTRKEY( "sethostname" ), LFUNCVAL ( wifi_station_sethostname ) },
+  { LSTRKEY( "gethostname" ), LFUNCVAL ( wifi_station_gethostname ) },
+  { LSTRKEY( "setreconpolicy" ), LFUNCVAL ( wifi_station_setreconpolicy ) },
   { LNILKEY, LNILVAL }
 };
 
@@ -1332,6 +1404,7 @@ const LUA_REG_TYPE wifi_map[] =
   { LSTRKEY( "startsmart" ), LFUNCVAL( wifi_start_smart ) },
   { LSTRKEY( "stopsmart" ), LFUNCVAL( wifi_exit_smart ) },
   { LSTRKEY( "sleeptype" ), LFUNCVAL( wifi_sleeptype ) },
+  { LSTRKEY( "setstatusled" ), LFUNCVAL( wifi_statusledinstall ) },
 #if LUA_OPTIMIZE_MEMORY > 0
   { LSTRKEY( "sta" ), LROVAL( wifi_station_map ) },
   { LSTRKEY( "ap" ), LROVAL( wifi_ap_map ) },
