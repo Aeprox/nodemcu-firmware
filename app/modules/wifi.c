@@ -1076,6 +1076,25 @@ static int wifi_station_event_mon_start(lua_State* L)
   return 0;
 }
 
+// Lua: wifi.sta.sethostname()
+static int wifi_station_sethostname( lua_State* L ){
+	size_t hnl;
+	const char *hn = luaL_checklstring( L, 1, &hnl );
+	if ((hnl!=0 && hnl>32) || hn == NULL){
+		return luaL_error( L, "param 'hostname' cant be empty or longer than 32 chars" );
+	}
+	bool success = wifi_station_set_hostname((char*)hn);
+	lua_pushboolean(L, success);
+	return 1;
+}
+
+// Lua: wifi.sta.gethostname()
+static int wifi_station_gethostname( lua_State* L ){
+	char* hostname = wifi_station_get_hostname();
+	lua_pushlstring(L, hostname,strlen(hostname));
+	return 1;
+}
+
 // Lua: wifi.ap.getmac()
 static int wifi_ap_getmac( lua_State* L ){
   return wifi_getmac(L, SOFTAP_IF);
@@ -1339,6 +1358,8 @@ static const LUA_REG_TYPE wifi_station_map[] =
   { LSTRKEY( "eventMonReg" ), LFUNCVAL ( wifi_station_event_mon_reg ) },
   { LSTRKEY( "eventMonStart" ), LFUNCVAL ( wifi_station_event_mon_start ) },
   { LSTRKEY( "eventMonStop" ), LFUNCVAL ( wifi_station_event_mon_stop ) },
+  { LSTRKEY( "sethostname" ), LFUNCVAL ( wifi_station_sethostname ) },
+  { LSTRKEY( "gethostname" ), LFUNCVAL ( wifi_station_gethostname ) },
   { LNILKEY, LNILVAL }
 };
 
